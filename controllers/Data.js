@@ -66,11 +66,11 @@ module.exports.trackData = function trackData (req, res, next) {
 
       if (ticket == undefined) {
         generateAndStoreTicket(user, pass, collectionId, res).then((ticket) => {
-          response = postData(collectionId, ticket, data, res)
+          response = postData(user, collectionId, ticket, data, res)
         })
       }
       else {
-        response = postData(collectionId, ticket, data, res)
+        response = postData(user, collectionId, ticket, data, res)
       }
     })
   })
@@ -199,7 +199,7 @@ function generateAndStoreTicket(user, pass, collectionId, res){
   })
 }
 
-function postData(collectionId, ticket, data, res){
+function postData(user, collectionId, ticket, data, res){
   var options = { method: 'POST',
     url: 'https://api.smartcity.kmitl.io/api/v1/collections/' + collectionId,
     headers: 
@@ -211,12 +211,26 @@ function postData(collectionId, ticket, data, res){
 
   request(options, function (error, response, body) {
     if (error) throw new Error(error);
-    console.log('statusCode: ', response && response.statusCode)
-    console.log('body: ', body);
-    res.send({
-      'statusCode': response.statusCode,
-      'body': body
-    })
+    if (response.statusCode == 201) {
+      res.send("Success")
+    }
+    else if (response.statusCode == 401) {
+
+      console.log('statusCode: ', response && response.statusCode)
+      console.log('ticket:'+ticket+"/")
+      //console.log('body: ', data);
+      res.send({
+        'msg': 'Error has occured. can not add',
+        'data': data,
+        'collectionId': collectionId
+      })
+    }
+    else {
+      res.send({
+        'statusCode': response.statusCode,
+        'body': body
+      })
+    }
     res.end()
   });
 }
