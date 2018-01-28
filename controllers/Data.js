@@ -17,73 +17,118 @@ module.exports.trackData = function trackData (req, res, next) {
   let collectionId = req.swagger.params.collectionId.value
   let data = req.swagger.params.data.value
   
-  
-
-  // Require ticket of the user of the connector to post data
-  const getTicket = () => {
-    let ticket = undefined
+  //Check user with collection is exist!! if not, then store it.
+  const getUser = () => {
+    let tempUser = undefined
     return new Promise((resolve, reject) => {
-      db.user.find({ user: user }, { _id: 0, ticket: 1 }).toArray(function (err, docs) {
+      db.user.find({ user: user, collectionId: collectionId }, { _id: 0, user: 1 }).toArray(function (err, docs) {
+        console.log(docs)
         if (docs[0] != undefined) {
-          ticket = docs[0]['ticket']
-          resolve(ticket)
+          tempUser = docs[0]['user']
+          resolve(tempUser)
         }
-        resolve(ticket)        
+        else 
+        {
+          getUserFromServer(user).then((user2) => {
+            if(user == user2){
+              db.user.insert({user:user,collectionId:collectionId})
+            }
+            else{
+              res.send('User does not exists, Please register.')
+              res.end()
+            }
+          })
+        }    
       })  
     })
   }
 
-  
-  let response = ""
-  getTicket().then((ticket) => {
-
-    if (ticket == undefined) {
-      const genTicket = () => {
-        return new Promise2((resolve2, reject2) => {
-          ticket = generateAndStoreTicket(user, pass, collectionId)
-          resolve2(ticket)
+  // Require ticket of the user of the connector to post data
+  getUser().then((tempUser) => {
+    console.log(tempUser)
+    const getTicket = () => {
+      let ticket = undefined
+      return new Promise((resolve, reject) => {
+        db.user.find({ user: user }, { _id: 0, ticket: 1 }).toArray(function (err, docs) {
+          if (docs[0] != undefined) {
+            ticket = docs[0]['ticket']
+            resolve(ticket)
+          }
+          resolve(ticket)
         })
-      }
-      genTicket().then((ticket) => {
-        response = postData(collectionId, ticket, data, res)
       })
     }
-    else {
-      response = postData(collectionId, ticket, data, res)
-    }
 
+
+
+    let response = ""
+    getTicket().then((ticket) => {
+
+      if (ticket == undefined) {
+        generateAndStoreTicket(user, pass, collectionId, res).then((ticket) => {
+          response = postData(collectionId, ticket, data, res)
+        })
+      }
+      else {
+        response = postData(collectionId, ticket, data, res)
+      }
+    })
   })
 };
 
-function generateAndStoreToken(user, pass){
-  console.log("generate token")
+function getUserFromServer(user){
+  return new Promise((resolve, reject) => {
+    var options = {
+      method: 'GET',
+      url: 'https://api.smartcity.kmitl.io/api/v1/users/' + user,
+    };
+
+    request(options, function (error, response, body) {
+      if (error) throw new Error(error);
+      if (body[0]['userNmae'] != undefined)
+        resolve(body[0]['userName'])
+      else
+        resolve(undefined)
+    });
+  })
+
+}
+
+function generateAndStoreToken(user, pass, res) {
+  console.log("generate token by " + user)
   var options = {
     method: 'PUT',
-    url: 'https://api.smartcity.kmitl.io/api/v1/users/' + user +'/token/',
+    url: 'https://api.smartcity.kmitl.io/api/v1/users/' + user + '/token/',
     auth: {
       user: user,
       password: pass
     }
   };
 
-  let token = ""
-  request(options, function (error, response, body) {
-    if (error) throw new Error(error);
-    // console.log(body);
-    if (response.statusCode == 200) {
-      token = body
-      db.user.insert({ user: user, token: token })
-      return token
-    }
-  });
+  return new Promise((resolve, reject) => {
+    request(options, function (error, response, body) {
+      if (error) throw new Error(error);
+      try {
+          resolve(body)
+          db.user.update({ user: user }, { $set:{token: body} })
+        if (response.statusCode == 401) {
+          res.send('User account does not exits!')
+          res.end()
+        }
+      }
+      catch (e) {
+        console.log('e: ' + e)
+      }
+    });
+  })
 }
 
-function generateAndStoreTicket(user, pass, collectionId){
-  console.log("generate ticket")
+function generateAndStoreTicket(user, pass, collectionId, res){
+  console.log("generate ticket by " + user + " with " + collectionId)
   let token = undefined
 
   //query token
-  const getToken = () => {  
+  const getToken = () => { 
     return new Promise((resolve, reject) => {
       db.user.find({ user: user},{_id:0, token:1}).toArray(function (err, docs) {
         if (docs[0] != undefined) {
@@ -95,48 +140,62 @@ function generateAndStoreTicket(user, pass, collectionId){
     })
   }
 
-  var options = {
-    method: 'POST',
-    url: 'https://api.smartcity.kmitl.io/api/v1/tickets/',
-    headers:
-      {
-        'Content-Type': 'application/json',
-        Authorization: token
-      },
-    body: { collectionId: collectionId },
-    json: true
-  };
+  // var options = {
+  //   method: 'POST',
+  //   url: 'https://api.smartcity.kmitl.io/api/v1/tickets/',
+  //   headers:
+  //     {
+  //       'Content-Type': 'application/json',
+  //       'Authorization': token
+  //     },
+  //   body: { collectionId: collectionId },
+  //   json: true
+  // };
 
-  getToken().then((token) => {
-    let ticket = ""
-    console.log("token: " + token)
-    if (token == undefined) {
-      const genToken = () => {
-        return new Promise((resolve, reject) => {
-          token = generateAndStoreToken(user, pass)
-          resolve(token)
+
+  return new Promise((resolve, reject) => {
+    getToken().then((token) => {
+      let ticket = ""
+      if (token == undefined) {
+        generateAndStoreToken(user, pass, res).then((token) => {
+          var options = {
+            method: 'POST',
+            url: 'https://api.smartcity.kmitl.io/api/v1/tickets/',
+            headers:
+              {
+                'Content-Type': 'application/json',
+                'Authorization': token
+              },
+            body: { collectionId: collectionId },
+            json: true
+          };
+          request(options, function (error, response, body) {
+            if (error) throw new Error(error);
+            console.log(body);            
+            resolve(body)
+            db.user.update({ user: user }, { $set: { ticket: body } })
+          });
         })
       }
-      genToken().then((token) => {
+      else {
+        var options = {
+          method: 'POST',
+          url: 'https://api.smartcity.kmitl.io/api/v1/tickets/',
+          headers:
+            {
+              'Content-Type': 'application/json',
+              'Authorization': token.toString()
+            },
+          body: { collectionId: collectionId },
+          json: true
+        };
         request(options, function (error, response, body) {
           if (error) throw new Error(error);
-          console.log(body);
-          ticket = body
-          db.user.update({ user: user, ticket: ticket })
-          return ticket
+          resolve(body)
+          db.user.update({ user: user }, { $set: { ticket: body } })
         });
-      })
-    }
-    else {
-      request(options, function (error, response, body) {
-        if (error) throw new Error(error);
-        console.log(body);
-        ticket = body
-        db.user.update({ user: user, ticket: ticket })
-        return ticket
-      });
-    }
-    
+      }
+    })
   })
 }
 
