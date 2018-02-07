@@ -45,9 +45,9 @@ paths:
           description: user of a connector
           required: false
           type: string
-        - name: password
+        - name: Authorization
           in: header
-          description: password of the user
+          description: Authorizaion of the user
           required: false
           type: string
         - name: collectionId

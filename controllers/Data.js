@@ -9,37 +9,35 @@ var url = require('url');
 var Data = require('./DataService');
 
 var db = mongojs.db
-var collectionName = db.collection("user")
 
-module.exports.trackData = function trackData (req, res, next) {
+module.exports.trackData = function trackData(req, res, next) {
   let user = req.swagger.params.user.value
-  let pass = req.swagger.params.password.value
+  let apiKey = req.swagger.params.Authorization.value
   let collectionId = req.swagger.params.collectionId.value
   let data = req.swagger.params.data.value
-  
+
   //Check user with collection is exist!! if not, then store it.
   const getUser = () => {
     let tempUser = undefined
     return new Promise((resolve, reject) => {
       db.user.find({ user: user, collectionId: collectionId }, { _id: 0, user: 1 }).toArray(function (err, docs) {
-        console.log(docs)
+        // console.log(docs)
         if (docs[0] != undefined) {
           tempUser = docs[0]['user']
           resolve(tempUser)
         }
-        else 
-        {
+        else {
           getUserFromServer(user).then((user2) => {
-            if(user == user2){
-              db.user.insert({user:user,collectionId:collectionId})
+            if (user == user2) {
+              db.user.insert({ user: user, apiKey: apiKey, collectionId: collectionId })
             }
-            else{
+            else {
               res.send('User does not exists, Please register.')
               res.end()
             }
           })
-        }    
-      })  
+        }
+      })
     })
   }
 
@@ -59,13 +57,10 @@ module.exports.trackData = function trackData (req, res, next) {
       })
     }
 
-
-
     let response = ""
     getTicket().then((ticket) => {
-
       if (ticket == undefined) {
-        generateAndStoreTicket(user, pass, collectionId, res).then((ticket) => {
+        generateAndStoreTicket(user, apiKey, collectionId, res).then((ticket) => {
           response = postData(user, collectionId, ticket, data, res)
         })
       }
@@ -76,7 +71,7 @@ module.exports.trackData = function trackData (req, res, next) {
   })
 };
 
-function getUserFromServer(user){
+function getUserFromServer(user) {
   return new Promise((resolve, reject) => {
     var options = {
       method: 'GET',
@@ -94,119 +89,40 @@ function getUserFromServer(user){
 
 }
 
-function generateAndStoreToken(user, pass, res) {
-  console.log("generate token by " + user)
-  var options = {
-    method: 'PUT',
-    url: 'https://api.smartcity.kmitl.io/api/v1/users/' + user + '/token/',
-    auth: {
-      user: user,
-      password: pass
-    }
-  };
+function generateAndStoreTicket(user, apiKey, collectionId, res) {
+  console.log("generate ticket by " + user + " with " + collectionId)
 
   return new Promise((resolve, reject) => {
+    var options = {
+      method: 'POST',
+      url: 'https://api.smartcity.kmitl.io/api/v1/tickets/',
+      headers:
+        {
+          'Content-Type': 'application/json',
+          'Authorization': apiKey.toString()
+        },
+      body: { collectionId: collectionId },
+      json: true
+    };
     request(options, function (error, response, body) {
       if (error) throw new Error(error);
-      try {
-          resolve(body)
-          db.user.update({ user: user }, { $set:{token: body} })
-        if (response.statusCode == 401) {
-          res.send('User account does not exits!')
-          res.end()
-        }
-      }
-      catch (e) {
-        console.log('e: ' + e)
-      }
+      resolve(body)
+      db.user.update({ user: user }, { $set: { ticket: body } })
     });
   })
 }
 
-function generateAndStoreTicket(user, pass, collectionId, res){
-  console.log("generate ticket by " + user + " with " + collectionId)
-  let token = undefined
-
-  //query token
-  const getToken = () => { 
-    return new Promise((resolve, reject) => {
-      db.user.find({ user: user},{_id:0, token:1}).toArray(function (err, docs) {
-        if (docs[0] != undefined) {
-          token = docs[0]['token']
-          resolve(token)
-        }
-        resolve(token)        
-      })  
-    })
-  }
-
-  // var options = {
-  //   method: 'POST',
-  //   url: 'https://api.smartcity.kmitl.io/api/v1/tickets/',
-  //   headers:
-  //     {
-  //       'Content-Type': 'application/json',
-  //       'Authorization': token
-  //     },
-  //   body: { collectionId: collectionId },
-  //   json: true
-  // };
-
-
-  return new Promise((resolve, reject) => {
-    getToken().then((token) => {
-      let ticket = ""
-      if (token == undefined) {
-        generateAndStoreToken(user, pass, res).then((token) => {
-          var options = {
-            method: 'POST',
-            url: 'https://api.smartcity.kmitl.io/api/v1/tickets/',
-            headers:
-              {
-                'Content-Type': 'application/json',
-                'Authorization': token
-              },
-            body: { collectionId: collectionId },
-            json: true
-          };
-          request(options, function (error, response, body) {
-            if (error) throw new Error(error);
-            console.log(body);            
-            resolve(body)
-            db.user.update({ user: user }, { $set: { ticket: body } })
-          });
-        })
-      }
-      else {
-        var options = {
-          method: 'POST',
-          url: 'https://api.smartcity.kmitl.io/api/v1/tickets/',
-          headers:
-            {
-              'Content-Type': 'application/json',
-              'Authorization': token.toString()
-            },
-          body: { collectionId: collectionId },
-          json: true
-        };
-        request(options, function (error, response, body) {
-          if (error) throw new Error(error);
-          resolve(body)
-          db.user.update({ user: user }, { $set: { ticket: body } })
-        });
-      }
-    })
-  })
-}
-
-function postData(user, collectionId, ticket, data, res){
-  var options = { method: 'POST',
+function postData(user, collectionId, ticket, data, res) {
+  var options = {
+    method: 'POST',
     url: 'https://api.smartcity.kmitl.io/api/v1/collections/' + collectionId,
-    headers: 
-      { 'Content-Type': 'application/json',
-        'Authorization': ticket },
+    headers:
+      {
+        'Content-Type': 'application/json',
+        'Authorization': ticket
+      },
     body: data,
-    json: true 
+    json: true
   };
 
   request(options, function (error, response, body) {
@@ -217,7 +133,6 @@ function postData(user, collectionId, ticket, data, res){
     else if (response.statusCode == 401) {
 
       console.log('statusCode: ', response && response.statusCode)
-      console.log('ticket:'+ticket+"/")
       //console.log('body: ', data);
       res.send({
         'msg': 'Error has occured. can not add',
