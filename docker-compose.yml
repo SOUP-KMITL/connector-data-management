@@ -1,0 +1,18 @@
+version : "3.3"
+services : 
+  user-connector-management :
+    build : .
+    image : worker-01:5000/connenctor-management_user-connector-management
+    networks: 
+      - default
+    extra_hosts :
+      - "mongo:172.16.0.6"
+    restart: always
+    ports : 
+      - 5999:5999
+  
+networks:
+  default:
+    external:
+#      name: apicekmitl_network
+      name: ticketing_default
