@@ -17,6 +17,7 @@
     "express": "^4.16.2",
     "js-yaml": "^3.3.0",
     "mongojs": "^2.4.1",
+    "request": "^2.85.0",
     "swagger-tools": "0.10.1"
   }
 }
