@@ -43,7 +43,7 @@ module.exports.trackData = function trackData(req, res, next) {
 
   // Require ticket of the user of the connector to post data
   getUser().then((tempUser) => {
-    console.log(tempUser)
+    // console.log(tempUser)
     const getTicket = () => {
       let ticket = undefined
       return new Promise((resolve, reject) => {
