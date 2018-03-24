@@ -80,6 +80,7 @@ function getUserFromServer(user) {
 
     request(options, function (error, response, body) {
       if (error) throw new Error(error);
+      body = JSON.parse(body)
       if (body[0]['userName'] != undefined)
         resolve(body[0]['userName'])
       else
