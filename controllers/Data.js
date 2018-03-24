@@ -80,7 +80,7 @@ function getUserFromServer(user) {
 
     request(options, function (error, response, body) {
       if (error) throw new Error(error);
-      if (body[0]['userNmae'] != undefined)
+      if (body[0]['userName'] != undefined)
         resolve(body[0]['userName'])
       else
         resolve(undefined)

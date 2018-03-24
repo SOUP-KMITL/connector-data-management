@@ -15,4 +15,4 @@ networks:
   default:
     external:
 #      name: apicekmitl_network
-      name: ticketing_default
+      name: ticketing_default_test
