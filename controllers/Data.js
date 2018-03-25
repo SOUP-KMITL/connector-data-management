@@ -108,7 +108,7 @@ function generateAndStoreTicket(user, apiKey, collectionId, res) {
     request(options, function (error, response, body) {
       if (error) throw new Error(error);
       resolve(body)
-      db.user.update({ user: user }, { $set: { ticket: body } })
+      db.user.update({ collectionId: collectionId }, { $set: { ticket: body } })
     });
   })
 }
