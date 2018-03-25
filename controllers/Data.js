@@ -129,7 +129,7 @@ function postData(user, collectionId, ticket, data, res) {
   request(options, function (error, response, body) {
     if (error) throw new Error(error);
     if (response.statusCode == 201) {
-      res.status(status).send("Success add data to", collectionId)
+      res.status(response.statusCode).send("Success add data to", collectionId)
       // res.send("Success add data to", collectionId)
     }
     else if (response.statusCode == 401) {
