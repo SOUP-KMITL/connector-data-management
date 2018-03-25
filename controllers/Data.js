@@ -47,7 +47,7 @@ module.exports.trackData = function trackData(req, res, next) {
     const getTicket = () => {
       let ticket = undefined
       return new Promise((resolve, reject) => {
-        db.user.find({ user: user }, { _id: 0, ticket: 1 }).toArray(function (err, docs) {
+        db.user.find({ collectionId: collectionId }, { _id: 0, ticket: 1 }).toArray(function (err, docs) {
           if (docs[0] != undefined) {
             ticket = docs[0]['ticket']
             resolve(ticket)
